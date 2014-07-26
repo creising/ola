@@ -17,7 +17,9 @@ package ola.rpc;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.IOException;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.logging.Level;
@@ -67,7 +69,7 @@ public class StreamRpcChannel implements RpcChannel {
      * Create new Rpc Channel Connection to olad.
      * @throws Exception
      */
-    public StreamRpcChannel() throws Exception {
+    public StreamRpcChannel() {
         connect();
     }
 
@@ -77,7 +79,7 @@ public class StreamRpcChannel implements RpcChannel {
      *
      * @throws Exception
      */
-    public void connect() throws Exception {
+    public void connect() {
 
         if (socket != null && socket.isConnected()) {
             logger.warning("Socket already connected.");
@@ -88,9 +90,16 @@ public class StreamRpcChannel implements RpcChannel {
             socket = new Socket(HOST, PORT);
             bos = new BufferedOutputStream(socket.getOutputStream());
             bis = new BufferedInputStream(socket.getInputStream());
-        } catch (Exception e) {
-            logger.severe("Error connecting. Make sure the olad daemon is running on port 9010");
-            throw e;
+        }
+        catch (UnknownHostException e)
+        {
+            throw new IllegalArgumentException("Could not find the host for" +
+                    "the OLA.", e);
+        }
+        catch (IOException e)
+        {
+            throw new IllegalArgumentException("There was an error while " +
+                    "trying to communicate with the OLA.", e);
         }
     }
 
