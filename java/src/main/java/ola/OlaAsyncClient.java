@@ -70,12 +70,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * CLient used to communicate with olad
  */
 public class OlaAsyncClient
-{ //extends OlaClientService {
+{
 
     /** For logging. */
     private static final Logger LOGGER =
@@ -147,32 +148,36 @@ public class OlaAsyncClient
     }
 
     /**
-     * Generic method for making Rpc Calls.
+     * Generic method for making RPC Calls.
      *
-     * @param method       Name of te Rpc Method to call
-     * @param inputMessage Input RpcMessage
-     * @param controller   an RPcController
-     * @return Message result message or null if the call failed.
+     * @param method       Name of te RPC Method to call.
+     * @param inputMessage the input message for the RPC call.
+     * @param controller   the RPC controller.
+     * @return true is the message failed, false if not.
      */
-    private Message callRpcMethod(String method, Message inputMessage, RpcController controller) {
+    private boolean callRpcMethod(String method,
+                                  Message inputMessage,
+                                  RpcController controller)
+    {
 
         final Message[] outputMessage = new Message[1];
 
 
-        RpcCallback<Message> cb = new RpcCallback<Message>() {
+        RpcCallback<Message> cb = new RpcCallback<Message>()
+        {
             @Override
-            public void run(Message arg0) {
+            public void run(Message arg0)
+            {
                 outputMessage[0] = arg0;
             }
         };
 
-        serverService.callMethod(serverService.getDescriptorForType().findMethodByName(method), controller, inputMessage, cb);
+        serverService.callMethod(
+                serverService.getDescriptorForType().findMethodByName(method),
+                controller, inputMessage, cb);
 
-        if (controller.failed()) {
-            return null;
-        }
 
-        return outputMessage[0];
+        return controller.failed();
     }
 
     /**
@@ -182,21 +187,24 @@ public class OlaAsyncClient
      * @param inputMessage Input RpcMessage
      * @param controller   an RpcController
      * @param cb           the callback object to be call after the method is called
-     * @return Message result message or null if the call failed.
+     * @return true if the message failed, false if not.
      */
-    private Message callRpcMethod(String method, Message inputMessage, RpcController controller, RpcCallback<Message> cb) {
+    private boolean callRpcMethod(String method,
+                                  Message inputMessage,
+                                  RpcController controller,
+                                  RpcCallback<Message> cb)
+    {
 
         final Message[] outputMessage = new Message[1];
         controller.reset();
 
 
-        serverService.callMethod(serverService.getDescriptorForType().findMethodByName(method), controller, inputMessage, cb);
+        serverService.callMethod(
+                serverService.getDescriptorForType().findMethodByName(method),
+                controller, inputMessage, cb);
 
-        if (controller.failed()) {
-            return null;
-        }
 
-        return outputMessage[0];
+        return controller.failed();
     }
 
     /**
@@ -237,7 +245,7 @@ public class OlaAsyncClient
      *
      * @param callback the callback used to get the plugins.
      * @param controller the RPC controller.
-     * @param response the plugin reponse.
+     * @param response the plugin response.
      */
     private void pluginsComplete(OlaCallback<List<Plugin>> callback,
                                  SimpleRpcController controller,
@@ -270,7 +278,7 @@ public class OlaAsyncClient
      * @param callback the callbackObject to call once complete. The callback
      *                 two arguments the description string and a RequestStatus object
      * @param pluginId The id of the plugin to get the description
-     * @return
+     * @return true if there was an error, false if not.
      */
     public boolean getPluginDescription(final OlaCallback<String> callback,
                                         int pluginId)
@@ -301,8 +309,7 @@ public class OlaAsyncClient
                 .setPluginId(pluginId)
                 .build();
 
-        callRpcMethod("GetPluginDescription", request, controller, cb);
-        return true;
+        return callRpcMethod("GetPluginDescription", request, controller, cb);
     }
 
     /**
@@ -333,130 +340,205 @@ public class OlaAsyncClient
     /**
      * Gets a filtered list of devices from the server.
      *
-     * @param callback     the callbackObject to call once complete. The callback
-     *                     two arguments: a list of {@link Device} Objects and a RequestStatus object
-     * @param pluginFilter A {@link ola.proto.Ola.PluginIds} to filter the plguins to receive
-     * @return
+     * @param callback called once the request is complete.
+     * @param pluginFilter specifics a filter for the plugins.
+     * @return true if there was an error, false if not.
      */
-    public boolean getDevices(final OlaCallback<List<Device>> callback, PluginIds pluginFilter) {
+    public boolean getDevices(final OlaCallback<List<Device>> callback,
+                              PluginIds pluginFilter) {
 
         final SimpleRpcController controller = new SimpleRpcController();
 
-        RpcCallback<Message> cb = new RpcCallback<Message>() {
+        RpcCallback<Message> cb = new RpcCallback<Message>()
+        {
+
             @Override
-            public void run(Message arg0) {
-                deviceInfoComplete(callback, controller, (DeviceInfoReply) arg0);
+            public void run(Message message)
+            {
+                if(message instanceof DeviceInfoReply)
+                {
+                    deviceInfoComplete(callback, controller, (DeviceInfoReply) message);
+                }
+                else
+                {
+                    throw new IllegalArgumentException("The callback was " +
+                            "expecting the message to be an instance of " +
+                            "DeviceInfoReply, but got: " + message);
+                }
             }
         };
+
         DeviceInfoRequest request = DeviceInfoRequest.newBuilder()
                 .setPluginId(pluginFilter.getNumber())
                 .build();
-        callRpcMethod("GetDeviceInfo", request, controller, cb);
-        return true;
+        return callRpcMethod("GetDeviceInfo", request, controller, cb);
     }
 
     /**
-     * Gets a list of all devices from the server.
+     * Processes the result of a device info request.
      *
-     * @param callback the callbackObject to call once complete. The callback
-     *                 two arguments: a list of {@link Device} Objects and a RequestStatus object
-     * @return
+     * @param callback called once the processing is complete.
+     * @param controller the RPC controller.
+     * @param response the response to the request.
      */
-    public boolean getDevices(final OlaCallback<List<Device>> callback) {
-        return getDevices(callback, PluginIds.OLA_PLUGIN_ALL);
-    }
-
-    private void deviceInfoComplete(OlaCallback<List<Device>> callback, RpcController controller, DeviceInfoReply response) {
+    private void deviceInfoComplete(OlaCallback<List<Device>> callback,
+                                    RpcController controller,
+                                    DeviceInfoReply response)
+    {
         RequestStatus status = new RequestStatus(controller);
-        if (!status.succeeded()) {
+        if (!status.succeeded())
+        {
             callback.processUpdate(status, null);
             return;
         }
 
         List<Device> deviceList = new ArrayList<Device>();
-        for (DeviceInfo deviceInfo : response.getDeviceList()) {
+
+        for (DeviceInfo deviceInfo : response.getDeviceList())
+        {
             List<Port> inputPorts = new ArrayList<Port>();
-            for (PortInfo port : deviceInfo.getInputPortList()) {
-                inputPorts.add(new Port(port.getPortId(), port.getUniverse(), port.getActive(), port.getDescription(), port.getSupportsRdm()));
+            for (PortInfo port : deviceInfo.getInputPortList())
+            {
+                inputPorts.add(new Port(port.getPortId(),
+                        port.getUniverse(), port.getActive(),
+                        port.getDescription(), port.getSupportsRdm()));
             }
+
             List<Port> outputPorts = new ArrayList<Port>();
-            for (PortInfo port : deviceInfo.getOutputPortList()) {
-                outputPorts.add(new Port(port.getPortId(), port.getUniverse(), port.getActive(), port.getDescription(), port.getSupportsRdm()));
+
+            for (PortInfo port : deviceInfo.getOutputPortList())
+            {
+                outputPorts.add(new Port(port.getPortId(), port.getUniverse(),
+                        port.getActive(), port.getDescription(),
+                        port.getSupportsRdm()));
             }
-            deviceList.add(new BasicDevice(deviceInfo.getDeviceId(), deviceInfo.getDeviceAlias(), deviceInfo.getDeviceName(), deviceInfo.getPluginId(), inputPorts, outputPorts));
+
+            deviceList.add(new BasicDevice(deviceInfo.getDeviceId(),
+                    deviceInfo.getDeviceAlias(), deviceInfo.getDeviceName(),
+                    deviceInfo.getPluginId(), inputPorts, outputPorts));
         }
 
         callback.processUpdate(status, deviceList);
     }
 
     /**
-     * Gets a a list of universes from the server.
+     * Requests a list of universes from the server.
      *
-     * @param callback the callbackObject to call once complete. The callback
-     *                 two arguments: a list of {@link Universe} Objects and a RequestStatus object
-     * @return
+     * @param callback called once the request is complete.
+     * @return true if there was an error, false if not.
      */
-    public boolean getUniverses(final OlaCallback<List<Universe>> callback) {
+    public boolean getUniverses(final OlaCallback<List<Universe>> callback)
+    {
 
         final SimpleRpcController controller = new SimpleRpcController();
 
-        RpcCallback<Message> cb = new RpcCallback<Message>() {
+        RpcCallback<Message> cb = new RpcCallback<Message>()
+        {
             @Override
-            public void run(Message arg0) {
-                universeInfoComplete(callback, controller, (UniverseInfoReply) arg0);
+            public void run(Message message)
+            {
+                if(message instanceof UniverseInfoReply)
+                {
+                    universeInfoComplete(callback, controller,
+                            (UniverseInfoReply) message);
+                }
+                else
+                {
+                    throw new IllegalArgumentException("The callback was " +
+                            "expecting the message to be an instance of " +
+                            "UniverseInfoReply, but got: " + message);
+                }
             }
         };
+
         OptionalUniverseRequest request = OptionalUniverseRequest.newBuilder()
                 .build();
-        callRpcMethod("GetUniverseInfo", request, controller, cb);
-        return true;
+        return callRpcMethod("GetUniverseInfo", request, controller, cb);
     }
 
-    private void universeInfoComplete(OlaCallback<List<Universe>> callback, SimpleRpcController controller, UniverseInfoReply universeInfoReply) {
+    /**
+     * Processes the response from a universe request.
+     *
+     * @param callback called once the processing is complete.
+     * @param controller the RPC controller.
+     * @param universeInfoReply the reply.
+     */
+    private void universeInfoComplete(OlaCallback<List<Universe>> callback,
+                                      SimpleRpcController controller,
+                                      UniverseInfoReply universeInfoReply)
+    {
         RequestStatus status = new RequestStatus(controller);
-        if (!status.succeeded()) {
+        if (!status.succeeded())
+        {
             callback.processUpdate(status, null);
             return;
         }
+
         List<Universe> universeList = new ArrayList<Universe>();
-        for (UniverseInfo universe : universeInfoReply.getUniverseList()) {
-            universeList.add(new Universe(universe.getUniverse(), universe.getName(), universe.getMergeMode()));
+        for (UniverseInfo universe : universeInfoReply.getUniverseList())
+        {
+            universeList.add(new Universe(universe.getUniverse(),
+                    universe.getName(), universe.getMergeMode()));
         }
 
         callback.processUpdate(status, universeList);
     }
 
     /**
-     * Get dmx data from the server
+     * Request DMX data from the server for a given universe ID.
      *
-     * @param callback   the callbackObject to call once complete. The callback
-     *                   three arguments: a universe number, an array of short with the dmx data
-     *                   and a RequestStatus object
-     * @param universeId The universe id to get the data for
-     * @return
+     * @param callback called once the request is complete.
+     * @param universeId The universe id to get the data for.
+     * @return true if there was an error, false if not.
      */
-    public boolean getDmx(final OlaDmxCallback<short[]> callback, int universeId) {
+    public boolean getDmx(final OlaDmxCallback<short[]> callback,
+                          int universeId)
+    {
 
         final SimpleRpcController controller = new SimpleRpcController();
 
-        RpcCallback<Message> cb = new RpcCallback<Message>() {
+        RpcCallback<Message> cb = new RpcCallback<Message>()
+        {
             @Override
-            public void run(Message arg0) {
-                dmxComplete(callback, controller, (DmxData) arg0);
+            public void run(Message message)
+            {
+                if(message instanceof DmxData)
+                {
+                    dmxComplete(callback, controller, (DmxData) message);
+                }
+                else
+                {
+                    throwExceptionForInstanceOfFailure("DmxData", message);
+                }
             }
         };
-        UniverseRequest request = UniverseRequest.newBuilder().setUniverse(universeId).build();
-        callRpcMethod("GetDmx", request, controller, cb);
-        return true;
+        UniverseRequest request = UniverseRequest.newBuilder()
+                .setUniverse(universeId)
+                .build();
+
+        return callRpcMethod("GetDmx", request, controller, cb);
     }
 
-    private void dmxComplete(OlaDmxCallback<short[]> callback, SimpleRpcController controller, DmxData dmxData) {
+    /**
+     * Processes the response to a DMX request.
+     *
+     * @param callback called once the response is processed.
+     * @param controller the RPC controller.`
+     * @param dmxData the DMX data from the response.
+     */
+    private void dmxComplete(OlaDmxCallback<short[]> callback,
+                             SimpleRpcController controller,
+                             DmxData dmxData)
+    {
         RequestStatus status = new RequestStatus(controller);
-        if (!status.succeeded()) {
+
+        if (!status.succeeded())
+        {
             callback.Run(status, null, -1);
             return;
         }
-        callback.Run(status, convertFromUnsigned(dmxData.getData()), dmxData.getUniverse());
+        callback.Run(status, convertFromUnsigned(dmxData.getData()),
+                dmxData.getUniverse());
     }
 
     /**
@@ -945,6 +1027,19 @@ public class OlaAsyncClient
         return true;
 
 
+    }
+
+    /**
+     * Throws an {@code IllegalArgumentException} to signify an instace of
+     * checked failed.
+     * @param type the name of the object you were expecting.
+     * @param obj the actual object.
+     */
+    private void throwExceptionForInstanceOfFailure(String type, Object obj)
+    {
+        throw new IllegalArgumentException("The callback was " +
+                "expecting the message to be an instance of " + type +
+                " but got: " + obj);
     }
 
     /**

@@ -2,8 +2,11 @@ package ola.driver;
 
 import ola.OlaAsyncClient;
 import ola.driver.actions.Action;
+import ola.driver.actions.GetDevicesWithFilter;
+import ola.driver.actions.GetDmx;
 import ola.driver.actions.GetPluginDetails;
 import ola.driver.actions.GetPlugins;
+import ola.driver.actions.GetUniverse;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -79,6 +82,9 @@ public class JavaCLI
         List<Action> actionList = new ArrayList<Action>();
         actionList.add(new GetPlugins(testClient));
         actionList.add(new GetPluginDetails(testClient));
+        actionList.add(new GetDevicesWithFilter(testClient));
+        actionList.add(new GetUniverse(testClient));
+        actionList.add(new GetDmx(testClient));
 
         JavaCLI driver = new JavaCLI(actionList);
     }

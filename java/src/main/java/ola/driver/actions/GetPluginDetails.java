@@ -15,13 +15,8 @@ import java.util.List;
  * Date: 7/25/14
  * Time: 10:39 PM
  */
-public class GetPluginDetails implements Action
+public class GetPluginDetails extends AbstractAction
 {
-    /** The client called by the action. */
-    private final OlaAsyncClient client;
-
-    /** Reads input from the user. */
-    private final InputParser parser = new InputParser();
 
     /**
      * Creates a new {@code GetPlugins} action.
@@ -30,11 +25,7 @@ public class GetPluginDetails implements Action
      */
     public GetPluginDetails(OlaAsyncClient client)
     {
-        if(client == null)
-        {
-            throw new NullPointerException("client cannot be null.");
-        }
-        this.client = client;
+        super(client);
     }
 
     /**
