@@ -163,6 +163,8 @@ include/ola/plugin_id.h
 include/ola/rdm/RDMResponseCodes.h
 include/ola/timecode/TimeCodeEnums.h
 java/src/main/java/ola/rpc/Rpc.java
+java/target/*
+java/src/main/java/ola/proto/
 javascript/compiler.jar
 javascript/trunk/
 libs/acn/e131_loadtest
